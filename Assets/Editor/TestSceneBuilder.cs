@@ -9,6 +9,11 @@ public static class TestSceneBuilder
     private const string ScenePath = "Assets/Scenes/TestRoom.unity";
     private const string ArtDir = "Assets/Art/Generated";
 
+    // Mitad del ancho/alto del escenario (suelo). La cámara se ajusta para
+    // no mostrar nunca fuera de estos límites en aspectos habituales (4:3 a 16:9).
+    private const float RoomHalfWidth = 8.5f;
+    private const float RoomHalfHeight = 5.5f;
+
     [MenuItem("McClarens/Build Test Room Scene")]
     public static void Build()
     {
@@ -38,7 +43,7 @@ public static class TestSceneBuilder
         var cameraGO = new GameObject("Main Camera");
         var cam = cameraGO.AddComponent<Camera>();
         cam.orthographic = true;
-        cam.orthographicSize = 6.5f;
+        cam.orthographicSize = 4.5f;
         cameraGO.transform.position = new Vector3(0f, 0f, -10f);
         cameraGO.tag = "MainCamera";
         cameraGO.AddComponent<AudioListener>();
@@ -46,7 +51,13 @@ public static class TestSceneBuilder
         CreateFloor(squareSprite);
         CreateWalls(squareSprite);
         CreateTables(squareSprite);
-        CreatePlayer(circleSprite);
+        Transform playerTransform = CreatePlayer(circleSprite);
+
+        var follow = cameraGO.AddComponent<CameraFollow2D>();
+        follow.Configure(
+            playerTransform,
+            new Vector2(-RoomHalfWidth, -RoomHalfHeight),
+            new Vector2(RoomHalfWidth, RoomHalfHeight));
 
         Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
         EditorSceneManager.SaveScene(scene, ScenePath);
@@ -61,7 +72,7 @@ public static class TestSceneBuilder
         sr.sprite = sprite;
         sr.color = new Color(0.15f, 0.15f, 0.15f);
         sr.sortingOrder = -10;
-        go.transform.localScale = new Vector3(17f, 11f, 1f);
+        go.transform.localScale = new Vector3(RoomHalfWidth * 2f, RoomHalfHeight * 2f, 1f);
     }
 
     private static void CreateWalls(Sprite sprite)
@@ -111,7 +122,7 @@ public static class TestSceneBuilder
         go.AddComponent<BoxCollider2D>();
     }
 
-    private static void CreatePlayer(Sprite sprite)
+    private static Transform CreatePlayer(Sprite sprite)
     {
         var go = new GameObject("Player");
         go.transform.position = Vector3.zero;
@@ -131,6 +142,8 @@ public static class TestSceneBuilder
         col.radius = 0.5f;
 
         go.AddComponent<TopDownController>();
+
+        return go.transform;
     }
 
     private static Sprite GetOrCreateSprite(string name, int size, bool circle)
