@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e5ef7ae237fe9854fa7d4dc17662ad8f, type: 3}
+  m_Name: Antonio_Intro
+  m_EditorClassIdentifier: Assembly-CSharp::DialogueData
+  nodes:
+  - speakerName: Antonio
+    line: "Oye... \xBFt\xFA tambi\xE9n has o\xEDdo hablar del vidrio?"
+    choices:
+    - moodLabel: Ignorarlo
+      resultingLine: (Silencio)
+      nextNodeIndex: 1
+    - moodLabel: Responder borde
+      resultingLine: "\xBFA ti qu\xE9 m\xE1s te da?"
+      nextNodeIndex: 2
+    - moodLabel: Furioso
+      resultingLine: "\xA1QU\xC9 VIDRIO NI QU\xC9 NARICES!"
+      nextNodeIndex: 3
+    nextNodeIndex: -1
+  - speakerName: Antonio
+    line: "...vale, tampoco hac\xEDa falta contestar. Como quieras."
+    choices: []
+    nextNodeIndex: 4
+  - speakerName: Antonio
+    line: Uy, con genio. Me caes bien.
+    choices: []
+    nextNodeIndex: 4
+  - speakerName: Antonio
+    line: "\xA1Eh, tranquilo! Era solo una pregunta."
+    choices: []
+    nextNodeIndex: 4
+  - speakerName: Antonio
+    line: "Bueno, \xBFqu\xE9 se te ha perdido por el McClarens?"
+    choices: []
+    nextNodeIndex: 5
+  - speakerName: Antonio
+    line: "Ya me contar\xE1s con calma. Suerte ah\xED fuera."
+    choices: []
+    nextNodeIndex: -1
