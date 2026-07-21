@@ -9,7 +9,7 @@ public class SimpleInteractable : MonoBehaviour, IInteractable
 
     public string InteractionPrompt => interactionPrompt;
 
-    public void Interact(GameObject interactor)
+    public bool Interact(GameObject interactor)
     {
         InteractionUI.Instance.ShowMessage(message);
 
@@ -17,5 +17,7 @@ public class SimpleInteractable : MonoBehaviour, IInteractable
         {
             GameFlags.Set(flag);
         }
+
+        return true;
     }
 }

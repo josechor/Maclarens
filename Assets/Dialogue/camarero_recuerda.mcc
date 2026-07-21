@@ -1,0 +1,3 @@
+@idle   required: password_given, !chapter2_done
+
+Camarero [normal]: ¿Ya hablaste con Maestro1 y Maestro2? Habla con ellos, va.

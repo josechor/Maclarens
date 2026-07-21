@@ -1,0 +1,12 @@
+@idle
+
+Camarero [normal]: Estoy limpiando vasos. ¿Necesitas algo?
+
+? Prota:
+  - Sí:
+      Prota [normal]: Sí, ponme una caña.
+      Camarero [feliz]: Marchando.
+      add copas
+  - No:
+      Prota [normal]: No, nada, gracias.
+      Camarero [normal]: Pues aquí sigo.

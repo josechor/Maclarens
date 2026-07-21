@@ -4,5 +4,7 @@ public interface IInteractable
 {
     string InteractionPrompt { get; }
 
-    void Interact(GameObject interactor);
+    // Devuelve true si la interacción realmente abrió algo (mensaje o diálogo) que debe
+    // bloquear el movimiento del jugador hasta que se cierre.
+    bool Interact(GameObject interactor);
 }

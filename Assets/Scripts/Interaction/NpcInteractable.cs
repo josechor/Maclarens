@@ -11,22 +11,23 @@ public class NpcInteractable : MonoBehaviour, IInteractable
 
     public string InteractionPrompt => interactionPrompt;
 
-    public void Interact(GameObject interactor)
+    public bool Interact(GameObject interactor)
     {
         ConversationAsset chosen = ConversationSelector.Select(conversations);
 
         if (chosen == null)
         {
             Debug.LogWarning($"{name}: ninguna conversación disponible ahora mismo.", this);
-            return;
+            return false;
         }
 
         if (DialogueRunner.Instance == null)
         {
             Debug.LogError("No hay ningún DialogueRunner en la escena.", this);
-            return;
+            return false;
         }
 
         DialogueRunner.Instance.StartConversation(chosen, interactor);
+        return true;
     }
 }

@@ -1,0 +1,6 @@
+@story   required: maestro1_done, maestro2_done, !chapter2_done
+
+Camarero [feliz]: Vaya, ya hablaste con los dos. Bien hecho.
+Camarero [normal]: Ahora sí, la historia sigue.
+
+set chapter2_done

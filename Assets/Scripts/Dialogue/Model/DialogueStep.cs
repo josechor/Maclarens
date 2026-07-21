@@ -23,6 +23,14 @@ public class FlagStep : DialogueStep
     public bool Value; // true = set, false = unset
 }
 
+// "add contador [cantidad]" / "reset contador": modifica un contador entero de GameFlags.
+public class CounterStep : DialogueStep
+{
+    public string Counter;
+    public int Delta;  // usado si Reset es false (por defecto +1; admite negativos)
+    public bool Reset; // true = poner el contador a 0 (ignora Delta)
+}
+
 // "? Personaje:" con opciones. Cada opción abre un bloque (Body) que, al terminar,
 // reconverge automáticamente al paso siguiente a este ChoiceStep.
 public class ChoiceStep : DialogueStep

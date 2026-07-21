@@ -303,6 +303,17 @@ public class DialogueRunner : MonoBehaviour
                     }
                     continue;
 
+                case CounterStep counterStep:
+                    if (counterStep.Reset)
+                    {
+                        GameFlags.SetCount(counterStep.Counter, 0);
+                    }
+                    else
+                    {
+                        GameFlags.Increment(counterStep.Counter, counterStep.Delta);
+                    }
+                    continue;
+
                 case CommandStep commandStep:
                     // Tanda 2: aquí irán cinemáticas ([wait], [move], Timeline...).
                     Debug.Log($"DialogueRunner: comando '{commandStep.Name}' ignorado (pendiente Tanda 2).");

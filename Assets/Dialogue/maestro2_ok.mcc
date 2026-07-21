@@ -1,0 +1,5 @@
+@story   required: password_given, !maestro2_done
+
+Maestro2 [normal]: "Vidrioo"... vale, la sabes. Adelante.
+
+set maestro2_done

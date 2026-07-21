@@ -1,10 +1,19 @@
 using System.Collections.Generic;
+using UnityEngine;
 
 // Registro de conversaciones ya reproducidas (para las de "una sola vez": Story y Context).
 // Tanda 1: solo en memoria (se reinicia cada partida). Persistencia en disco = Tanda 2.
 public static class ConversationHistory
 {
     private static readonly HashSet<string> played = new HashSet<string>();
+
+    // Con "Reload Domain" desactivado en Enter Play Mode Settings, los static NO se reinician
+    // solos al parar y volver a darle a Play. Este atributo sí se vuelve a ejecutar en ese caso.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetOnPlaySessionStart()
+    {
+        ResetAll();
+    }
 
     public static bool HasPlayed(string conversationId)
     {

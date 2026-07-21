@@ -60,9 +60,11 @@ set intro_done
 - **`@story`** — conversación principal. Ocurre **una vez**. Máxima prioridad.
 - **`@context`** — comentario sobre un evento. Ocurre **una vez**. Prioridad media.
 - **`@idle`** — relleno por defecto. **Repetible**. Prioridad baja.
-- `required:` (opcional) — lista de flags separadas por comas:
+- `required:` (opcional) — lista de condiciones separadas por comas:
   - `flag` → esa flag debe estar **activa**.
   - `!flag` → esa flag debe estar **sin activar**.
+  - `contador >= 3` (también `>`, `<=`, `<`, `==`, `!=`) → comparación sobre un **contador numérico**
+    (ver sección de Flags más abajo). El número siempre va a la derecha.
 
 Cuando el jugador habla con un NPC, el sistema elige **la conversación disponible de mayor prioridad**
 (Story > Context > Idle). Las de "una vez" ya jugadas dejan de aparecer.
@@ -103,8 +105,42 @@ set nombre_flag
 unset nombre_flag
 ```
 
-Activan o desactivan una flag global en ese punto exacto de la conversación. Sirven para condicionar
-otras conversaciones (con `required:` en su cabecera).
+Activan o desactivan una flag global (booleana) en ese punto exacto de la conversación. Sirven para
+condicionar otras conversaciones (con `required:` en su cabecera).
+
+### Contadores (flags numéricas)
+
+```
+add nombre_contador
+add nombre_contador 3
+add nombre_contador -1
+reset nombre_contador
+```
+
+- `add nombre` suma 1. `add nombre N` suma N (N puede ser negativo, para restar).
+- `reset nombre` lo pone a 0.
+- Un contador nunca usado vale 0.
+- Se consultan en la cabecera de otra conversación con `required: nombre >= 3`.
+
+**Patrón típico — "a la N-ésima vez, un mensaje distinto"**: como no hay comparación de "exactamente
+esta vez" fácil de reutilizar entre varias conversaciones (cada `.mcc` es un guion fijo), lo normal es
+encadenar condiciones sobre el mismo contador, una conversación por hito, ordenadas de más a menos
+específica en la lista del NPC:
+
+```
+@idle   required: intentos_password == 2      # 3ª vez: el chiste especial
+...
+add intentos_password
+```
+```
+@idle   required: intentos_password < 2        # 1ª y 2ª vez: la respuesta normal
+...
+add intentos_password
+```
+
+La de arriba, al estar primero en la lista del NPC, gana el desempate mientras aplique; en cuanto
+`intentos_password` pasa de 2, dejan de cumplirse ambas condiciones especiales y solo queda disponible
+el `@idle` de reserva sin `required:` (que debe ir el último de todos en la lista).
 
 ### Comandos (Tanda 2, todavía no hacen nada)
 
@@ -183,12 +219,13 @@ Se configuran en `Assets/Input/DialogueControls.inputactions` (puedes añadir m�
 
 ```
 @story | @context | @idle          cabecera (1ª línea)
-required: flagA, !flagB            condición opcional en la cabecera
+required: flagA, !flagB, c >= 3    condición opcional en la cabecera (flags y/o contadores)
 Personaje [expr]: texto            línea hablada
 ? Prota:                           inicio de elección
   - Ánimo:                         opción (botón)
       Personaje: texto             bloque de la opción (indentado)
-set flag  /  unset flag            activar/desactivar flag
+set flag  /  unset flag            activar/desactivar flag booleana
+add contador [N]  /  reset contador  sumar (por defecto 1) / poner a 0 un contador numérico
 [comando args]                     comando de cinemática (Tanda 2)
 # comentario                       ignorado
 <color=#hex>...</color>, <b>...</b>  rich-text de TMP

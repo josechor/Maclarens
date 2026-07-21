@@ -3,7 +3,7 @@
 > Documento de seguimiento. Refleja **qué está construido** y **qué falta**.
 > La visión y filosofía están en [DialogSystem.md](DialogSystem.md). El manual de uso, en [README_USO.md](README_USO.md).
 
-Última actualización: **2026-07-21**.
+Última actualización: **2026-07-21**. Tanda 1 ya confirmada funcionando en el Editor (jugada de principio a fin).
 
 ---
 
@@ -28,7 +28,12 @@ Trabajo dividido en dos tandas. **Tanda 1 = núcleo jugable (hecha).** Tanda 2 =
 - [x] **Retratos** NPC izquierda / jugador derecha (básico, con atenuación del que no habla).
 - [x] **Typewriter** saltable + **TextMeshPro** (soporta rich-text `<color>`, `<b>`).
 - [x] **Input formalizado** (`Assets/Input/DialogueControls.inputactions`): teclado + mando.
-- [x] **Contenido de ejemplo**: `camarero_intro`, `camarero_abraham`, `camarero_idle` + personajes Camarero y Prota.
+- [x] **Contenido de ejemplo**: `camarero_intro`, `camarero_abraham`, `camarero_idle` + personajes Camarero y Prota
+      (ampliado con un ejemplo de encadenado Camarero + 2 NPCs de prueba, ver `TestSceneBuilder.cs`).
+- [x] **Contadores numéricos** (flags con valor entero, no solo on/off): `add contador [N]` / `reset contador`
+      en el cuerpo, `required: contador >= 3` (y `>`, `<=`, `<`, `==`, `!=`) en la cabecera. Viven en
+      `GameFlags` junto a los flags booleanos, mismo ciclo de vida (en memoria). Pensado para patrones
+      "a la N-ésima vez, un mensaje distinto" — ver ejemplo en [README_USO.md](README_USO.md).
 
 ## Tanda 2 — PENDIENTE ⬜
 
@@ -36,8 +41,10 @@ Trabajo dividido en dos tandas. **Tanda 1 = núcleo jugable (hecha).** Tanda 2 =
 - [ ] **Comandos de cinemática** embebidos: `[wait 0.5]`, `[move Abraham stage]`, `[shake box]`, Timeline.
       (El parser ya los reconoce como `CommandStep`; el runner los ignora con un aviso).
 - [ ] **Estilos** de diálogo: narrador, pensamiento, sueño, sin-retrato.
-- [ ] **Persistencia en disco** de `GameFlags` y `ConversationHistory` (ahora solo viven en memoria y se
-      reinician cada partida). Necesario para que las conversaciones "una vez" se recuerden entre sesiones.
+- [ ] **Persistencia en disco** de `GameFlags` (booleanas + contadores) y `ConversationHistory` (ahora solo
+      viven en memoria y se reinician cada partida). Necesario para que las conversaciones "una vez" se
+      recuerden entre sesiones, y para poder guardar/cargar partida (archivo de guardado sobrescribible).
+      **Siguiente paso planeado**, justo después de los contadores.
 - [ ] **Sonido de texto** (por personaje o global; aún sin decidir).
 
 ---
@@ -47,9 +54,9 @@ Trabajo dividido en dos tandas. **Tanda 1 = núcleo jugable (hecha).** Tanda 2 =
 | Archivo | Rol |
 |---|---|
 | `Assets/Scripts/Dialogue/Parsing/MccParser.cs` | Texto `.mcc` → pasos tipados. Errores con línea. |
-| `Assets/Scripts/Dialogue/Model/DialogueStep.cs` | `LineStep`, `ChoiceStep`+`ChoiceOption`, `FlagStep`, `CommandStep`. |
+| `Assets/Scripts/Dialogue/Model/DialogueStep.cs` | `LineStep`, `ChoiceStep`+`ChoiceOption`, `FlagStep`, `CounterStep`, `CommandStep`. |
 | `Assets/Scripts/Dialogue/Model/ConversationType.cs` | Enum Story/Context/Idle. |
-| `Assets/Scripts/Dialogue/Model/ConversationCondition.cs` | Condiciones de flags (`required` / `!`). |
+| `Assets/Scripts/Dialogue/Model/ConversationCondition.cs` | Condiciones de flags (`required` / `!`) y de contadores (`CounterCondition`, comparadores). |
 | `Assets/Scripts/Dialogue/Model/ConversationAsset.cs` | Asset generado desde un `.mcc` (tipo + condición + texto). |
 | `Assets/Editor/Dialogue/MccImporter.cs` | ScriptedImporter de `.mcc` (valida personajes/expresiones). |
 | `Assets/Scripts/Dialogue/CharacterDef.cs` | Personaje: nombre, lado, expresiones (con retratos). |
@@ -66,6 +73,6 @@ Trabajo dividido en dos tandas. **Tanda 1 = núcleo jugable (hecha).** Tanda 2 =
 
 ## Pendiente de verificar (cuando haya Unity)
 
-No hay Unity CLI en el equipo de desarrollo, así que **el código no se ha compilado todavía**.
-Pasos de prueba en [README_USO.md](README_USO.md#probar-el-sistema). Si al abrir el editor hay algún error
-de compilación (típicamente algún nombre de API de TextMeshPro), anótalo y se corrige.
+No hay Unity CLI en el equipo de desarrollo, así que cada cambio se prueba abriendo el Editor a mano.
+Pasos de prueba en [README_USO.md](README_USO.md#probar-el-sistema). Los contadores numéricos (recién
+añadidos) todavía no se han probado en el Editor — revisar la Consola tras el primer build con ellos.

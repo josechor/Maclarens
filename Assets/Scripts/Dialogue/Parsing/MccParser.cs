@@ -130,13 +130,17 @@ public static class MccParser
         index++;
     }
 
+    // Comparadores admitidos en required:, de más a menos específico (">=" antes que ">", etc.)
+    // para no partir mal un operador de dos caracteres.
+    private static readonly string[] ComparatorTokens = { ">=", "<=", "==", "!=", ">", "<" };
+
     private static void ParseRequired(int lineNumber, string rest, ConversationCondition condition)
     {
         const string prefix = "required:";
         if (!rest.StartsWith(prefix))
         {
             throw new MccParseException(lineNumber,
-                $"No entiendo '{rest}' en la cabecera. Formato: required: flagA, !flagB");
+                $"No entiendo '{rest}' en la cabecera. Formato: required: flagA, !flagB, contador >= 3");
         }
 
         string list = rest.Substring(prefix.Length).Trim();
@@ -147,20 +151,67 @@ public static class MccParser
 
         foreach (string raw in list.Split(','))
         {
-            string flag = raw.Trim();
-            if (flag.Length == 0)
+            string item = raw.Trim();
+            if (item.Length == 0)
             {
                 continue;
             }
 
-            if (flag.StartsWith("!"))
+            if (TryParseCounterCondition(lineNumber, item, out CounterCondition counterCondition))
             {
-                condition.forbiddenFlags.Add(flag.Substring(1).Trim());
+                condition.counterConditions.Add(counterCondition);
+                continue;
+            }
+
+            if (item.StartsWith("!"))
+            {
+                condition.forbiddenFlags.Add(item.Substring(1).Trim());
             }
             else
             {
-                condition.requiredFlags.Add(flag);
+                condition.requiredFlags.Add(item);
             }
+        }
+    }
+
+    private static bool TryParseCounterCondition(int lineNumber, string item, out CounterCondition result)
+    {
+        result = null;
+
+        foreach (string op in ComparatorTokens)
+        {
+            int opIndex = item.IndexOf(op, StringComparison.Ordinal);
+            if (opIndex < 0)
+            {
+                continue;
+            }
+
+            string counter = item.Substring(0, opIndex).Trim();
+            string valueText = item.Substring(opIndex + op.Length).Trim();
+
+            if (counter.Length == 0 || !int.TryParse(valueText, out int value))
+            {
+                throw new MccParseException(lineNumber,
+                    $"Comparación numérica mal formada en '{item}'. Formato: contador {op} numero");
+            }
+
+            result = new CounterCondition { counter = counter, comparator = ComparatorOf(op), value = value };
+            return true;
+        }
+
+        return false;
+    }
+
+    private static CounterComparator ComparatorOf(string op)
+    {
+        switch (op)
+        {
+            case ">=": return CounterComparator.GreaterOrEqual;
+            case "<=": return CounterComparator.LessOrEqual;
+            case "==": return CounterComparator.Equal;
+            case "!=": return CounterComparator.NotEqual;
+            case ">": return CounterComparator.Greater;
+            default: return CounterComparator.Less; // "<"
         }
     }
 
@@ -271,6 +322,16 @@ public static class MccParser
             return MakeFlagStep(line, text.Length > 5 ? text.Substring(6).Trim() : "", false);
         }
 
+        if (text.StartsWith("add ") || text == "add")
+        {
+            return MakeCounterStep(line, text.Length > 3 ? text.Substring(4).Trim() : "");
+        }
+
+        if (text.StartsWith("reset ") || text == "reset")
+        {
+            return MakeResetStep(line, text.Length > 5 ? text.Substring(6).Trim() : "");
+        }
+
         if (text.StartsWith("[") && text.EndsWith("]"))
         {
             string inner = text.Substring(1, text.Length - 2).Trim();
@@ -296,6 +357,37 @@ public static class MccParser
         }
 
         return new FlagStep { Line = line.Number, Flag = flag, Value = value };
+    }
+
+    // "add contador" (+1) / "add contador N" (+N, N puede ser negativo).
+    private static CounterStep MakeCounterStep(RawLine line, string rest)
+    {
+        if (rest.Length == 0)
+        {
+            throw new MccParseException(line.Number, "add sin nombre de contador.");
+        }
+
+        string[] parts = rest.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        string counter = parts[0];
+        int delta = 1;
+
+        if (parts.Length > 1 && !int.TryParse(parts[1], out delta))
+        {
+            throw new MccParseException(line.Number, $"'{parts[1]}' no es un número válido para 'add {counter}'.");
+        }
+
+        return new CounterStep { Line = line.Number, Counter = counter, Delta = delta };
+    }
+
+    // "reset contador": lo pone a 0.
+    private static CounterStep MakeResetStep(RawLine line, string counter)
+    {
+        if (counter.Length == 0)
+        {
+            throw new MccParseException(line.Number, "reset sin nombre de contador.");
+        }
+
+        return new CounterStep { Line = line.Number, Counter = counter, Reset = true };
     }
 
     // "Personaje [expresion]: texto"  ó  "Personaje: texto"

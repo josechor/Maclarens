@@ -1,0 +1,18 @@
+@story   required: !intro_done
+
+Camarero [normal]: Vaya, despertaste... por fin.
+Camarero [feliz]: <color=#ffcc00>¡Estás encerrado, majo!</color>
+
+? Prota:
+  - Chulo:
+      Prota [normal]: Tú tranquilo. He salido de sitios peores que este antro.
+      Camarero [feliz]: Ja. Ese es el espíritu.
+  - Nervioso:
+      Prota [normal]: ¿C-cómo que encerrado? ¡Yo solo venía a por una caña!
+      Camarero [normal]: Respira, hombre. Hay salida.
+  - ¿Eres tonto?:
+      Camarero [enfadado]: Oye, un respeto, que llevo aquí toda la noche.
+      Prota [normal]: Vale, vale... perdón.
+
+Camarero [normal]: Total. Habla con los Maestros y te abro la puerta.
+set intro_done

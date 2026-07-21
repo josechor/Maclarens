@@ -101,8 +101,10 @@ public class Interactor : MonoBehaviour
         }
         else if (current != null)
         {
-            current.Interact(gameObject);
-            controller.InputEnabled = false;
+            if (current.Interact(gameObject))
+            {
+                controller.InputEnabled = false;
+            }
         }
     }
 
