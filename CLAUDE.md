@@ -30,4 +30,17 @@ Lista completa en [Docs/Technical/DevPrinciples.md](Docs/Technical/DevPrinciples
 | [Docs/Technical/EngineAndArt.md](Docs/Technical/EngineAndArt.md) | Motor, lenguaje, estilo visual, construcción de escenarios, género |
 | [Docs/Technical/DevPrinciples.md](Docs/Technical/DevPrinciples.md) | Reglas de desarrollo a respetar en todo el proyecto |
 
+### Sistema de diálogos (el sistema central del juego)
+
+Los diálogos son lo más importante del proyecto. Tienen documentación propia en `Docs/DialogSystem/`:
+
+| Archivo | Contenido |
+|---|---|
+| [Docs/DialogSystem/DialogSystem.md](Docs/DialogSystem/DialogSystem.md) | Visión y decisiones: cómo debe sentirse y qué debe hacer |
+| [Docs/DialogSystem/ARQUITECTURA.md](Docs/DialogSystem/ARQUITECTURA.md) | Arquitectura técnica: clases, flujo, formato `.mcc`, puntos de extensión |
+| [Docs/DialogSystem/ESTADO.md](Docs/DialogSystem/ESTADO.md) | Qué está hecho y qué falta (Tanda 1 / Tanda 2), mapa de archivos |
+| [Docs/DialogSystem/README_USO.md](Docs/DialogSystem/README_USO.md) | Manual para escribir conversaciones en `.mcc` |
+
+Antes de tocar el sistema de diálogos, lee `ARQUITECTURA.md` y `ESTADO.md`.
+
 Consulta el archivo correspondiente antes de proponer contenido narrativo, personajes, escenarios o arquitectura de sistemas — no inventes datos que contradigan lo ya documentado.

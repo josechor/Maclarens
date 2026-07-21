@@ -3,29 +3,44 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
+// Ejecuta una conversación recorriendo sus pasos. Usa una PILA de "frames" para entrar y salir
+// de los bloques de elección: cuando el bloque de una opción termina, se vuelve automáticamente
+// al paso siguiente a la elección (reconvergencia), sin índices que mantener.
 public class DialogueRunner : MonoBehaviour
 {
-    private const string PlayerSpeakerName = "Tú";
-
     public static DialogueRunner Instance { get; private set; }
 
+    [SerializeField] private InputActionAsset controls;
     [SerializeField] private Button[] choiceButtons;
     [SerializeField] private Button continueButton;
 
     public bool IsActive { get; private set; }
 
-    // Sigue en true un frame más que IsActive, para que Interactor no reprocese
-    // la misma pulsación de E que acaba de cerrar el diálogo y lo reabra al instante.
+    // Sigue en true un frame más que IsActive, para que Interactor no reprocese la misma
+    // pulsación que acaba de cerrar el diálogo y lo reabra al instante.
     public bool IsBlockingInteraction { get; private set; }
 
-    private DialogueData data;
-    private int currentIndex;
-    private int selectedChoiceIndex;
+    private class Frame
+    {
+        public List<DialogueStep> Steps;
+        public int Index;
+    }
+
+    private readonly Stack<Frame> stack = new Stack<Frame>();
+
+    private ConversationAsset currentConversation;
     private TopDownController playerController;
     private bool skipInputThisFrame;
 
-    private bool awaitingPlayerLine;
-    private int pendingNextIndex;
+    private bool awaitingChoice;
+    private ChoiceStep currentChoice;
+    private int selectedChoiceIndex;
+
+    private InputActionMap dialogueMap;
+    private InputAction advanceAction;
+    private InputAction navUpAction;
+    private InputAction navDownAction;
+    private InputAction[] choiceActions;
 
     public void ConfigureButtons(Button[] choices, Button continueBtn)
     {
@@ -33,10 +48,55 @@ public class DialogueRunner : MonoBehaviour
         continueButton = continueBtn;
     }
 
+    public void ConfigureControls(InputActionAsset controlsAsset)
+    {
+        controls = controlsAsset;
+    }
+
     private void Awake()
     {
         Instance = this;
+        ResolveActions();
+        WireButtons();
+    }
 
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
+    }
+
+    private void ResolveActions()
+    {
+        if (controls == null)
+        {
+            Debug.LogError("DialogueRunner: no hay InputActionAsset de controles asignado.");
+            return;
+        }
+
+        dialogueMap = controls.FindActionMap("Dialogue", false);
+        if (dialogueMap == null)
+        {
+            Debug.LogError("DialogueRunner: el InputActionAsset no tiene un mapa 'Dialogue'.");
+            return;
+        }
+
+        advanceAction = dialogueMap.FindAction("Advance");
+        navUpAction = dialogueMap.FindAction("NavigateUp");
+        navDownAction = dialogueMap.FindAction("NavigateDown");
+        choiceActions = new[]
+        {
+            dialogueMap.FindAction("Choice1"),
+            dialogueMap.FindAction("Choice2"),
+            dialogueMap.FindAction("Choice3"),
+            dialogueMap.FindAction("Choice4")
+        };
+    }
+
+    private void WireButtons()
+    {
         if (choiceButtons != null)
         {
             for (int i = 0; i < choiceButtons.Length; i++)
@@ -53,38 +113,39 @@ public class DialogueRunner : MonoBehaviour
 
         if (continueButton != null)
         {
-            continueButton.onClick.AddListener(OnContinueClicked);
+            continueButton.onClick.AddListener(OnAdvanceClicked);
         }
     }
 
-    private void OnDestroy()
+    public void StartConversation(ConversationAsset conversation, GameObject player)
     {
-        if (Instance == this)
+        if (conversation == null)
         {
-            Instance = null;
-        }
-    }
-
-    public void StartDialogue(DialogueData dialogue, GameObject player)
-    {
-        if (dialogue == null || dialogue.nodes == null || dialogue.nodes.Count == 0)
-        {
-            Debug.LogWarning("DialogueRunner.StartDialogue: dialogue nulo o sin nodos.");
+            Debug.LogWarning("DialogueRunner.StartConversation: conversación nula.");
             return;
         }
 
         if (DialogueUI.Instance == null)
         {
-            Debug.LogError("DialogueRunner.StartDialogue: no hay ningún DialogueUI en la escena.");
+            Debug.LogError("DialogueRunner.StartConversation: no hay ningún DialogueUI en la escena.");
             return;
         }
 
-        data = dialogue;
-        currentIndex = 0;
+        List<DialogueStep> steps = conversation.ParseSteps();
+        if (steps == null || steps.Count == 0)
+        {
+            Debug.LogWarning($"DialogueRunner: la conversación '{conversation.conversationId}' está vacía o tiene errores.");
+            return;
+        }
+
+        currentConversation = conversation;
+        stack.Clear();
+        stack.Push(new Frame { Steps = steps, Index = 0 });
+
         IsActive = true;
         IsBlockingInteraction = true;
         skipInputThisFrame = true;
-        awaitingPlayerLine = false;
+        awaitingChoice = false;
 
         playerController = player != null ? player.GetComponent<TopDownController>() : null;
         if (playerController != null)
@@ -92,7 +153,9 @@ public class DialogueRunner : MonoBehaviour
             playerController.InputEnabled = false;
         }
 
-        ShowCurrentNode();
+        dialogueMap?.Enable();
+
+        ShowNext();
     }
 
     private void Update()
@@ -108,63 +171,13 @@ public class DialogueRunner : MonoBehaviour
             return;
         }
 
-        var keyboard = Keyboard.current;
-        if (keyboard == null)
+        if (awaitingChoice)
         {
-            return;
+            HandleChoiceInput();
         }
-
-        bool confirmPressed = keyboard.eKey.wasPressedThisFrame
-            || keyboard.enterKey.wasPressedThisFrame
-            || keyboard.numpadEnterKey.wasPressedThisFrame;
-
-        if (awaitingPlayerLine)
+        else
         {
-            if (confirmPressed)
-            {
-                OnContinueClicked();
-            }
-            return;
-        }
-
-        DialogueNode node = data.nodes[currentIndex];
-
-        if (node.choices != null && node.choices.Count > 0)
-        {
-            int count = node.choices.Count;
-
-            if (WasPreviousPressed(keyboard))
-            {
-                selectedChoiceIndex = (selectedChoiceIndex - 1 + count) % count;
-                DialogueUI.Instance.SetSelectedChoice(selectedChoiceIndex);
-                return;
-            }
-
-            if (WasNextPressed(keyboard))
-            {
-                selectedChoiceIndex = (selectedChoiceIndex + 1) % count;
-                DialogueUI.Instance.SetSelectedChoice(selectedChoiceIndex);
-                return;
-            }
-
-            if (confirmPressed)
-            {
-                OnChoiceClicked(selectedChoiceIndex);
-                return;
-            }
-
-            for (int i = 0; i < count && i < 4; i++)
-            {
-                if (IsChoiceKeyPressed(keyboard, i))
-                {
-                    OnChoiceClicked(i);
-                    return;
-                }
-            }
-        }
-        else if (confirmPressed)
-        {
-            OnContinueClicked();
+            HandleLineInput();
         }
     }
 
@@ -173,94 +186,168 @@ public class DialogueRunner : MonoBehaviour
         IsBlockingInteraction = IsActive;
     }
 
-    private void OnChoiceClicked(int index)
+    private void HandleLineInput()
     {
-        if (!IsActive || awaitingPlayerLine)
+        if (Pressed(advanceAction))
         {
-            return;
+            OnAdvanceClicked();
         }
-
-        DialogueNode node = data.nodes[currentIndex];
-        if (node.choices == null || index < 0 || index >= node.choices.Count)
-        {
-            return;
-        }
-
-        DialogueChoice choice = node.choices[index];
-        pendingNextIndex = choice.nextNodeIndex;
-        awaitingPlayerLine = true;
-
-        foreach (var flag in choice.setFlagsOnSelect)
-        {
-            GameFlags.Set(flag);
-        }
-
-        DialogueUI.Instance.Show(PlayerSpeakerName, choice.resultingLine, null);
     }
 
-    private void OnContinueClicked()
+    private void HandleChoiceInput()
     {
-        if (!IsActive)
+        int count = currentChoice.Options.Count;
+
+        if (Pressed(navUpAction))
         {
+            selectedChoiceIndex = (selectedChoiceIndex - 1 + count) % count;
+            DialogueUI.Instance.SetSelectedChoice(selectedChoiceIndex);
             return;
         }
 
-        if (awaitingPlayerLine)
+        if (Pressed(navDownAction))
         {
-            awaitingPlayerLine = false;
-            Advance(pendingNextIndex);
+            selectedChoiceIndex = (selectedChoiceIndex + 1) % count;
+            DialogueUI.Instance.SetSelectedChoice(selectedChoiceIndex);
             return;
         }
 
-        DialogueNode node = data.nodes[currentIndex];
-        if (node.choices != null && node.choices.Count > 0)
+        if (choiceActions != null)
         {
-            return;
-        }
-
-        Advance(node.nextNodeIndex);
-    }
-
-    private void Advance(int nextIndex)
-    {
-        currentIndex = nextIndex;
-        ShowCurrentNode();
-    }
-
-    private void ShowCurrentNode()
-    {
-        if (currentIndex < 0 || currentIndex >= data.nodes.Count)
-        {
-            EndDialogue();
-            return;
-        }
-
-        DialogueNode node = data.nodes[currentIndex];
-
-        foreach (var flag in node.setFlagsOnEnter)
-        {
-            GameFlags.Set(flag);
-        }
-
-        List<string> choiceLabels = null;
-        if (node.choices != null && node.choices.Count > 0)
-        {
-            choiceLabels = new List<string>();
-            foreach (var choice in node.choices)
+            for (int i = 0; i < choiceActions.Length && i < count; i++)
             {
-                choiceLabels.Add(choice.moodLabel);
+                if (Pressed(choiceActions[i]))
+                {
+                    SelectChoice(i);
+                    return;
+                }
             }
         }
 
-        selectedChoiceIndex = 0;
-        DialogueUI.Instance.Show(node.speakerName, node.line, choiceLabels);
+        if (Pressed(advanceAction))
+        {
+            SelectChoice(selectedChoiceIndex);
+        }
     }
 
-    private void EndDialogue()
+    // Click de ratón sobre la pista "continuar" o sobre una línea.
+    private void OnAdvanceClicked()
+    {
+        if (!IsActive || awaitingChoice)
+        {
+            return;
+        }
+
+        if (DialogueUI.Instance.IsTyping)
+        {
+            DialogueUI.Instance.CompleteTyping();
+        }
+        else
+        {
+            ShowNext();
+        }
+    }
+
+    // Click de ratón sobre un botón de opción.
+    private void OnChoiceClicked(int index)
+    {
+        if (!IsActive || !awaitingChoice)
+        {
+            return;
+        }
+
+        SelectChoice(index);
+    }
+
+    private void SelectChoice(int index)
+    {
+        if (currentChoice == null || index < 0 || index >= currentChoice.Options.Count)
+        {
+            return;
+        }
+
+        ChoiceOption option = currentChoice.Options[index];
+        awaitingChoice = false;
+        currentChoice = null;
+
+        // El bloque de la opción se ejecuta y, al agotarse, la pila vuelve al tronco común.
+        stack.Push(new Frame { Steps = option.Body, Index = 0 });
+        ShowNext();
+    }
+
+    private void ShowNext()
+    {
+        while (stack.Count > 0)
+        {
+            Frame frame = stack.Peek();
+
+            if (frame.Index >= frame.Steps.Count)
+            {
+                stack.Pop();
+                continue;
+            }
+
+            DialogueStep step = frame.Steps[frame.Index];
+            frame.Index++;
+
+            switch (step)
+            {
+                case FlagStep flagStep:
+                    if (flagStep.Value)
+                    {
+                        GameFlags.Set(flagStep.Flag);
+                    }
+                    else
+                    {
+                        GameFlags.Clear(flagStep.Flag);
+                    }
+                    continue;
+
+                case CommandStep commandStep:
+                    // Tanda 2: aquí irán cinemáticas ([wait], [move], Timeline...).
+                    Debug.Log($"DialogueRunner: comando '{commandStep.Name}' ignorado (pendiente Tanda 2).");
+                    continue;
+
+                case LineStep lineStep:
+                    DialogueUI.Instance.ShowLine(lineStep.Speaker, lineStep.Expression, lineStep.Text);
+                    return;
+
+                case ChoiceStep choiceStep:
+                    currentChoice = choiceStep;
+                    selectedChoiceIndex = 0;
+                    awaitingChoice = true;
+                    DialogueUI.Instance.ShowChoices(BuildLabels(choiceStep));
+                    return;
+            }
+        }
+
+        EndConversation();
+    }
+
+    private static List<string> BuildLabels(ChoiceStep choice)
+    {
+        var labels = new List<string>(choice.Options.Count);
+        foreach (var option in choice.Options)
+        {
+            labels.Add(option.MoodLabel);
+        }
+
+        return labels;
+    }
+
+    private void EndConversation()
     {
         IsActive = false;
-        awaitingPlayerLine = false;
+        awaitingChoice = false;
+        currentChoice = null;
+
         DialogueUI.Instance.Hide();
+        dialogueMap?.Disable();
+
+        if (currentConversation != null && currentConversation.IsOnce)
+        {
+            ConversationHistory.MarkPlayed(currentConversation.conversationId);
+        }
 
         if (playerController != null)
         {
@@ -268,30 +355,12 @@ public class DialogueRunner : MonoBehaviour
         }
 
         playerController = null;
-        data = null;
+        currentConversation = null;
+        stack.Clear();
     }
 
-    private static bool WasPreviousPressed(Keyboard k)
+    private static bool Pressed(InputAction action)
     {
-        return k.wKey.wasPressedThisFrame || k.upArrowKey.wasPressedThisFrame
-            || k.aKey.wasPressedThisFrame || k.leftArrowKey.wasPressedThisFrame;
-    }
-
-    private static bool WasNextPressed(Keyboard k)
-    {
-        return k.sKey.wasPressedThisFrame || k.downArrowKey.wasPressedThisFrame
-            || k.dKey.wasPressedThisFrame || k.rightArrowKey.wasPressedThisFrame;
-    }
-
-    private static bool IsChoiceKeyPressed(Keyboard keyboard, int index)
-    {
-        switch (index)
-        {
-            case 0: return keyboard.digit1Key.wasPressedThisFrame;
-            case 1: return keyboard.digit2Key.wasPressedThisFrame;
-            case 2: return keyboard.digit3Key.wasPressedThisFrame;
-            case 3: return keyboard.digit4Key.wasPressedThisFrame;
-            default: return false;
-        }
+        return action != null && action.WasPerformedThisFrame();
     }
 }

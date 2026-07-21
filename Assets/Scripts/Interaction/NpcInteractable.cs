@@ -5,27 +5,19 @@ public class NpcInteractable : MonoBehaviour, IInteractable
 {
     [SerializeField] private string interactionPrompt = "Pulsa E para hablar";
 
-    [Tooltip("Se evalúan en orden; gana la primera cuyas condiciones se cumplan. Pon la opción sin condiciones la última, como conversación por defecto.")]
-    [SerializeField] private List<ConditionalDialogue> dialogueOptions = new List<ConditionalDialogue>();
+    [Tooltip("Todas las conversaciones de este NPC. El selector elige por prioridad " +
+             "Story > Context > Idle entre las disponibles; a igual prioridad gana la primera de la lista.")]
+    [SerializeField] private List<ConversationAsset> conversations = new List<ConversationAsset>();
 
     public string InteractionPrompt => interactionPrompt;
 
     public void Interact(GameObject interactor)
     {
-        DialogueData chosen = null;
-
-        foreach (var option in dialogueOptions)
-        {
-            if (option.Matches())
-            {
-                chosen = option.dialogue;
-                break;
-            }
-        }
+        ConversationAsset chosen = ConversationSelector.Select(conversations);
 
         if (chosen == null)
         {
-            Debug.LogWarning($"{name}: ninguna condición de diálogo coincide (y no hay ninguna por defecto).", this);
+            Debug.LogWarning($"{name}: ninguna conversación disponible ahora mismo.", this);
             return;
         }
 
@@ -35,6 +27,6 @@ public class NpcInteractable : MonoBehaviour, IInteractable
             return;
         }
 
-        DialogueRunner.Instance.StartDialogue(chosen, interactor);
+        DialogueRunner.Instance.StartConversation(chosen, interactor);
     }
 }
