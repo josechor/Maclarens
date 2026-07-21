@@ -32,4 +32,26 @@ public static class ConversationHistory
     {
         played.Clear();
     }
+
+    // ---------- Persistencia (usado por SaveSystem) ----------
+
+    public static void WriteTo(SaveData data)
+    {
+        data.playedConversations = new List<string>(played);
+    }
+
+    public static void ReadFrom(SaveData data)
+    {
+        played.Clear();
+
+        if (data?.playedConversations == null)
+        {
+            return;
+        }
+
+        foreach (string id in data.playedConversations)
+        {
+            played.Add(id);
+        }
+    }
 }

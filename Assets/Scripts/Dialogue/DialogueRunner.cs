@@ -368,6 +368,9 @@ public class DialogueRunner : MonoBehaviour
         playerController = null;
         currentConversation = null;
         stack.Clear();
+
+        // Autoguardado: la conversación pudo cambiar flags/contadores y marcar "ya jugada".
+        SaveSystem.Save();
     }
 
     private static bool Pressed(InputAction action)

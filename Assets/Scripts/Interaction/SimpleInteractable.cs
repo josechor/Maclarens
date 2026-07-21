@@ -13,9 +13,15 @@ public class SimpleInteractable : MonoBehaviour, IInteractable
     {
         InteractionUI.Instance.ShowMessage(message);
 
-        foreach (var flag in setFlagsOnInteract)
+        if (setFlagsOnInteract.Count > 0)
         {
-            GameFlags.Set(flag);
+            foreach (var flag in setFlagsOnInteract)
+            {
+                GameFlags.Set(flag);
+            }
+
+            // Autoguardado: solo si esta interacción cambió el estado del mundo.
+            SaveSystem.Save();
         }
 
         return true;

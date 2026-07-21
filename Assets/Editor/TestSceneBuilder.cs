@@ -118,6 +118,7 @@ public static class TestSceneBuilder
         CreateTables(squareSprite);
         CreateBottle(circleSprite);
         CreateAbraham(circleSprite);
+        CreateExitDoor(squareSprite);
         CreateNpc(circleSprite, "Camarero", new Vector3(-6f, -1f, 0f), new Color(0.8f, 0.3f, 0.35f),
             "Pulsa E para hablar",
             new[] { intro, password, continua, contextMesa, contextBotella, context, recuerda, sinCopas, idle });
@@ -289,9 +290,11 @@ set password_given
 @"@story   required: maestro1_done, maestro2_done, !chapter2_done
 
 Camarero [feliz]: Vaya, ya hablaste con los dos. Bien hecho.
-Camarero [normal]: Ahora sí, la historia sigue.
+Camarero [normal]: Toma, la llave de la puerta. Ya te puedes largar.
+Camarero [normal]: La salida está al sur. Sal por ahí cuando quieras.
 
 set chapter2_done
+set has_key
 ";
     }
 
@@ -500,6 +503,23 @@ set maestro2_done
             new List<string> { FlagTalkedToAbraham });
     }
 
+    // Puerta de salida, encajada en la pared sur. Cerrada hasta que el Camarero da la llave (has_key);
+    // al salir con la llave, ExitDoorInteractable termina el juego y vuelve al menú.
+    private static void CreateExitDoor(Sprite sprite)
+    {
+        var go = new GameObject("ExitDoor");
+        go.transform.position = new Vector3(0f, -4.9f, 0f);
+        go.transform.localScale = new Vector3(1.6f, 1.2f, 1f);
+
+        var sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite = sprite;
+        sr.color = new Color(0.45f, 0.28f, 0.12f);
+        sr.sortingOrder = 2;
+
+        go.AddComponent<BoxCollider2D>();
+        go.AddComponent<ExitDoorInteractable>();
+    }
+
     private static void CreateNpc(Sprite sprite, string name, Vector3 position, Color color, string prompt, ConversationAsset[] conversations)
     {
         var go = new GameObject(name);
@@ -587,6 +607,7 @@ set maestro2_done
         topDown.SetFacingIndicator(indicatorGO.transform, 0.42f);
 
         go.AddComponent<Interactor>();
+        go.AddComponent<PlayerPersistence>(); // guarda/restaura la posición del jugador
 
         return go.transform;
     }

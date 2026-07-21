@@ -69,4 +69,49 @@ public static class GameFlags
         setFlags.Clear();
         counters.Clear();
     }
+
+    // ---------- Persistencia (usado por SaveSystem) ----------
+
+    // Copia el estado actual a un SaveData (flags + contadores como listas paralelas).
+    public static void WriteTo(SaveData data)
+    {
+        data.flags = new List<string>(setFlags);
+
+        data.counterNames = new List<string>(counters.Count);
+        data.counterValues = new List<int>(counters.Count);
+        foreach (var kv in counters)
+        {
+            data.counterNames.Add(kv.Key);
+            data.counterValues.Add(kv.Value);
+        }
+    }
+
+    // Reemplaza el estado actual por el de un SaveData.
+    public static void ReadFrom(SaveData data)
+    {
+        setFlags.Clear();
+        counters.Clear();
+
+        if (data == null)
+        {
+            return;
+        }
+
+        if (data.flags != null)
+        {
+            foreach (string flag in data.flags)
+            {
+                setFlags.Add(flag);
+            }
+        }
+
+        if (data.counterNames != null && data.counterValues != null)
+        {
+            int n = System.Math.Min(data.counterNames.Count, data.counterValues.Count);
+            for (int i = 0; i < n; i++)
+            {
+                counters[data.counterNames[i]] = data.counterValues[i];
+            }
+        }
+    }
 }
