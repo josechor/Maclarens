@@ -12,6 +12,9 @@ public class DialogueChoice
     public string resultingLine;
 
     public int nextNodeIndex = -1;
+
+    [Tooltip("Flags que se activan al elegir esta opción (ej: RespondióBorde).")]
+    public List<string> setFlagsOnSelect = new List<string>();
 }
 
 [System.Serializable]
@@ -26,6 +29,9 @@ public class DialogueNode
 
     [Tooltip("Siguiente nodo cuando el nodo NO tiene choices (línea seguida con 'pulsa E'). -1 termina la conversación.")]
     public int nextNodeIndex = -1;
+
+    [Tooltip("Flags que se activan en cuanto se muestra este nodo (ej: HabloConCamarero).")]
+    public List<string> setFlagsOnEnter = new List<string>();
 }
 
 [CreateAssetMenu(fileName = "NewDialogue", menuName = "McClarens/Dialogue")]

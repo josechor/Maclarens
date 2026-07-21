@@ -190,6 +190,11 @@ public class DialogueRunner : MonoBehaviour
         pendingNextIndex = choice.nextNodeIndex;
         awaitingPlayerLine = true;
 
+        foreach (var flag in choice.setFlagsOnSelect)
+        {
+            GameFlags.Set(flag);
+        }
+
         DialogueUI.Instance.Show(PlayerSpeakerName, choice.resultingLine, null);
     }
 
@@ -231,6 +236,11 @@ public class DialogueRunner : MonoBehaviour
         }
 
         DialogueNode node = data.nodes[currentIndex];
+
+        foreach (var flag in node.setFlagsOnEnter)
+        {
+            GameFlags.Set(flag);
+        }
 
         List<string> choiceLabels = null;
         if (node.choices != null && node.choices.Count > 0)

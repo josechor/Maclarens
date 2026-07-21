@@ -13,6 +13,7 @@ public static class TestSceneBuilder
     private const string ScenePath = "Assets/Scenes/TestRoom.unity";
     private const string ArtDir = "Assets/Art/Generated";
     private const string DialogueDir = "Assets/Dialogue";
+    private const string FlagTalkedToAbraham = "TalkedToAbraham";
 
     // Mitad del ancho/alto del escenario (suelo). La cámara se ajusta para
     // no mostrar nunca fuera de estos límites en aspectos habituales (4:3 a 16:9).
@@ -43,6 +44,12 @@ public static class TestSceneBuilder
         Sprite circleSprite = GetOrCreateSprite("PlayerCircle", 64, true);
         Sprite squareSprite = GetOrCreateSprite("WhiteSquare", 32, false);
 
+        string staleDialoguePath = $"{DialogueDir}/Antonio_Intro.asset";
+        if (AssetDatabase.LoadAssetAtPath<DialogueData>(staleDialoguePath) != null)
+        {
+            AssetDatabase.DeleteAsset(staleDialoguePath);
+        }
+
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
         var cameraGO = new GameObject("Main Camera");
@@ -57,7 +64,8 @@ public static class TestSceneBuilder
         CreateWalls(squareSprite);
         CreateTables(squareSprite);
         CreateBottle(circleSprite);
-        CreateNpc(circleSprite);
+        CreateAbraham(circleSprite);
+        CreateCamarero(circleSprite);
         Transform playerTransform = CreatePlayer(circleSprite);
 
         var follow = cameraGO.AddComponent<CameraFollow2D>();
@@ -153,9 +161,9 @@ public static class TestSceneBuilder
         ConfigureInteractable(interactable, "Esto es una botella.");
     }
 
-    private static void CreateNpc(Sprite sprite)
+    private static void CreateAbraham(Sprite sprite)
     {
-        var go = new GameObject("NPC_Placeholder");
+        var go = new GameObject("Abraham");
         go.transform.position = new Vector3(5f, 2f, 0f);
         go.transform.localScale = new Vector3(0.9f, 0.9f, 1f);
 
@@ -166,99 +174,126 @@ public static class TestSceneBuilder
 
         go.AddComponent<CircleCollider2D>();
 
+        var interactable = go.AddComponent<SimpleInteractable>();
+        ConfigureInteractable(
+            interactable,
+            "Abraham sigue bailando sin parar. Ni te mira. Ni te oye.",
+            "Pulsa E para hablar",
+            new List<string> { FlagTalkedToAbraham });
+    }
+
+    private static void CreateCamarero(Sprite sprite)
+    {
+        var go = new GameObject("Camarero");
+        go.transform.position = new Vector3(-6f, -1f, 0f);
+        go.transform.localScale = new Vector3(0.9f, 0.9f, 1f);
+
+        var sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite = sprite;
+        sr.color = new Color(0.8f, 0.3f, 0.35f);
+        sr.sortingOrder = 1;
+
+        go.AddComponent<CircleCollider2D>();
+
         var npc = go.AddComponent<NpcInteractable>();
-        DialogueData dialogue = GetOrCreateSampleDialogue();
+
+        DialogueData knowsAbraham = GetOrCreateDialogueAsset("Camarero_KnowsAbraham", BuildCamareroKnowsAbrahamNodes);
+        DialogueData defaultDialogue = GetOrCreateDialogueAsset("Camarero_Default", BuildCamareroDefaultNodes);
 
         var so = new SerializedObject(npc);
         so.FindProperty("interactionPrompt").stringValue = "Pulsa E para hablar";
-        so.FindProperty("dialogue").objectReferenceValue = dialogue;
+
+        var listProp = so.FindProperty("dialogueOptions");
+        listProp.arraySize = 2;
+
+        // Orden importa: la condicionada va primero, la de sin condiciones (por defecto) la última.
+        var option0 = listProp.GetArrayElementAtIndex(0);
+        SetStringListProperty(option0.FindPropertyRelative("requiredFlagsSet"), new List<string> { FlagTalkedToAbraham });
+        SetStringListProperty(option0.FindPropertyRelative("requiredFlagsUnset"), new List<string>());
+        option0.FindPropertyRelative("dialogue").objectReferenceValue = knowsAbraham;
+
+        var option1 = listProp.GetArrayElementAtIndex(1);
+        SetStringListProperty(option1.FindPropertyRelative("requiredFlagsSet"), new List<string>());
+        SetStringListProperty(option1.FindPropertyRelative("requiredFlagsUnset"), new List<string>());
+        option1.FindPropertyRelative("dialogue").objectReferenceValue = defaultDialogue;
+
         so.ApplyModifiedPropertiesWithoutUndo();
     }
 
-    private static DialogueData GetOrCreateSampleDialogue()
+    private static void SetStringListProperty(SerializedProperty listProp, List<string> values)
     {
-        string path = $"{DialogueDir}/Antonio_Intro.asset";
+        listProp.arraySize = values.Count;
+        for (int i = 0; i < values.Count; i++)
+        {
+            listProp.GetArrayElementAtIndex(i).stringValue = values[i];
+        }
+    }
+
+    private static DialogueData GetOrCreateDialogueAsset(string assetName, Func<List<DialogueNode>> buildNodes)
+    {
+        string path = $"{DialogueDir}/{assetName}.asset";
         Directory.CreateDirectory(DialogueDir);
 
-        DialogueData data = AssetDatabase.LoadAssetAtPath<DialogueData>(path);
-        bool isNew = data == null;
-
-        if (isNew)
+        // Si ya existe, se respeta tal cual esté (puede llevar ediciones a mano
+        // hechas en el Inspector). Solo se genera contenido de ejemplo la primera vez.
+        DialogueData existing = AssetDatabase.LoadAssetAtPath<DialogueData>(path);
+        if (existing != null)
         {
-            data = ScriptableObject.CreateInstance<DialogueData>();
+            return existing;
         }
 
-        data.nodes = BuildSampleDialogueNodes();
+        var data = ScriptableObject.CreateInstance<DialogueData>();
+        data.nodes = buildNodes();
 
-        if (isNew)
-        {
-            AssetDatabase.CreateAsset(data, path);
-        }
-        else
-        {
-            EditorUtility.SetDirty(data);
-        }
-
+        AssetDatabase.CreateAsset(data, path);
         AssetDatabase.SaveAssets();
 
         return data;
     }
 
-    private static List<DialogueNode> BuildSampleDialogueNodes()
+    private static List<DialogueNode> BuildCamareroDefaultNodes()
     {
         return new List<DialogueNode>
         {
-            // 0: pregunta con 3 actitudes posibles
             new DialogueNode
             {
-                speakerName = "Antonio",
-                line = "Oye... ¿tú también has oído hablar del vidrio?",
+                speakerName = "Camarero",
+                line = "¡Hola! ¿Quieres algo?",
                 choices = new List<DialogueChoice>
                 {
-                    new DialogueChoice { moodLabel = "Ignorarlo", resultingLine = "(Silencio)", nextNodeIndex = 1 },
-                    new DialogueChoice { moodLabel = "Responder borde", resultingLine = "¿A ti qué más te da?", nextNodeIndex = 2 },
-                    new DialogueChoice { moodLabel = "Furioso", resultingLine = "¡QUÉ VIDRIO NI QUÉ NARICES!", nextNodeIndex = 3 }
+                    new DialogueChoice { moodLabel = "Sí", resultingLine = "Sí, ponme algo.", nextNodeIndex = 1 },
+                    new DialogueChoice { moodLabel = "No", resultingLine = "No, nada.", nextNodeIndex = 2 }
                 }
             },
-            // 1: reacción a "Ignorarlo"
             new DialogueNode
             {
-                speakerName = "Antonio",
-                line = "...vale, tampoco hacía falta contestar. Como quieras.",
-                nextNodeIndex = 4
+                speakerName = "Camarero",
+                line = "Ahora te traigo. Avisa si necesitas otra cosa.",
+                nextNodeIndex = -1
             },
-            // 2: reacción a "Responder borde"
             new DialogueNode
             {
-                speakerName = "Antonio",
-                line = "Uy, con genio. Me caes bien.",
-                nextNodeIndex = 4
-            },
-            // 3: reacción a "Furioso"
-            new DialogueNode
-            {
-                speakerName = "Antonio",
-                line = "¡Eh, tranquilo! Era solo una pregunta.",
-                nextNodeIndex = 4
-            },
-            // 4: converge, sigue normal
-            new DialogueNode
-            {
-                speakerName = "Antonio",
-                line = "Bueno, ¿qué se te ha perdido por el McClarens?",
-                nextNodeIndex = 5
-            },
-            // 5: final
-            new DialogueNode
-            {
-                speakerName = "Antonio",
-                line = "Ya me contarás con calma. Suerte ahí fuera.",
+                speakerName = "Camarero",
+                line = "Pues no molestes.",
                 nextNodeIndex = -1
             }
         };
     }
 
-    private static void ConfigureInteractable(SimpleInteractable interactable, string message, string prompt = null)
+    private static List<DialogueNode> BuildCamareroKnowsAbrahamNodes()
+    {
+        return new List<DialogueNode>
+        {
+            new DialogueNode
+            {
+                speakerName = "Camarero",
+                line = "Veo que has intentado hablar con Abraham. Ese no hace caso si no le llevas algo de comer.",
+                nextNodeIndex = -1
+            }
+        };
+    }
+
+    private static void ConfigureInteractable(SimpleInteractable interactable, string message, string prompt = null, List<string> setFlags = null)
     {
         var so = new SerializedObject(interactable);
         so.FindProperty("message").stringValue = message;
@@ -266,6 +301,11 @@ public static class TestSceneBuilder
         if (!string.IsNullOrEmpty(prompt))
         {
             so.FindProperty("interactionPrompt").stringValue = prompt;
+        }
+
+        if (setFlags != null && setFlags.Count > 0)
+        {
+            SetStringListProperty(so.FindProperty("setFlagsOnInteract"), setFlags);
         }
 
         so.ApplyModifiedPropertiesWithoutUndo();
